@@ -8,7 +8,7 @@ from pathlib import Path
 import shutil
 
 import datasets
-from datasets import load_dataset, load_metric
+from datasets import load_dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from sklearn.metrics import classification_report
@@ -182,6 +182,9 @@ def main():
         config=config,
     )
 
+    special_tokens_dict = {'additional_special_tokens': ['[URL]']}
+    tokenizer.add_special_tokens(special_tokens_dict)
+
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     label_to_id = {v: i for i, v in enumerate(label_list)}
@@ -286,8 +289,6 @@ def main():
         num_warmup_steps=args.num_warmup_steps,
         num_training_steps=max_train_steps,
     )
-
-    metric = load_metric("f1")
 
     total_batch_size = (
         args.per_device_train_batch_size * args.gradient_accumulation_steps
