@@ -314,9 +314,9 @@ def main():
     if args.output_dir:
         output_dir = os.path.join(args.output_dir, run_name)
 
+    train_loss = 0.
     for epoch in range(args.num_train_epochs):
         model.train()
-        train_loss = 0.
         for step, batch in enumerate(train_dataloader):
             batch.to(device)
             outputs = model(**batch)
