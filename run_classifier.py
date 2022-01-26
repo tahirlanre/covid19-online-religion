@@ -184,6 +184,7 @@ def main():
 
     special_tokens_dict = {'additional_special_tokens': ['[URL]']}
     tokenizer.add_special_tokens(special_tokens_dict)
+    model.resize_token_embeddings(len(tokenizer))
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
