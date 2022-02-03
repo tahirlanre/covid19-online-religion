@@ -260,7 +260,7 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     elif args.model_name_or_path:
         tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-        special_tokens_dict = {'additional_special_tokens': ['[URL]']}
+        special_tokens_dict = {"additional_special_tokens": ["[URL]", "[USER]"]}
         tokenizer.add_special_tokens(special_tokens_dict)
     else:
         logger.info("Training new tokenizer from scratch")
@@ -495,7 +495,9 @@ def main():
     progress_bar = tqdm(range(args.max_train_steps))
     global_step = 0
 
-    run_name = wandb.run.name if wandb.run else datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    run_name = (
+        wandb.run.name if wandb.run else datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    )
     if args.output_dir:
         output_dir = os.path.join(args.output_dir, run_name)
 
@@ -523,17 +525,17 @@ def main():
                 if args.output_dir is not None:
                     model_to_save = model.module if hasattr(model, "module") else model
                     save_checkpoint(model_to_save, tokenizer, global_step, output_dir)
-                
+
                 # log interval loss
                 train_loss = train_loss / args.save_steps
                 wandb.log({"train_loss": train_loss})
-                train_loss = 0.
-            
+                train_loss = 0.0
+
             # if completed_steps >= args.max_train_steps:
             #     break
 
         model.eval()
-        eval_loss = 0.
+        eval_loss = 0.0
         for step, batch in enumerate(eval_dataloader):
             batch.to(device)
             with torch.no_grad():
@@ -551,8 +553,8 @@ def main():
         logger.info(f"epoch {epoch}: perplexity: {perplexity}")
 
     if args.output_dir is not None:
-        model.save_pretrained(args.output_dir)
-        tokenizer.save_pretrained(args.output_dir)
+        model.save_pretrained(output_dir)
+        tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":
