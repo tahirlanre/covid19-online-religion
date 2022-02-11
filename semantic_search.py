@@ -7,7 +7,7 @@ import torch
 
 model = SentenceTransformer("all-mpnet-base-v2")
 
-MAX_CORPUS_SIZE = 10
+MAX_CORPUS_SIZE = 1000000
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
