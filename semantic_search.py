@@ -48,7 +48,7 @@ def main():
         else "./data/reddit/queries.txt"
     )
 
-    output_path = f"./data/reddit/cos_scores_{label}2.txt"
+    output_path = f"./data/reddit/cos_scores_{label}.txt"
 
     logger.info(f" Reading query sentences from {query_path}")
     queries = read(query_path)
@@ -71,7 +71,8 @@ def main():
         ]
 
         cos_scores = []
-        for chunk in chunks:
+        for idx, chunk in enumerate(chunks):
+            logger.info(f"chunk {idx + 1}")
             corpus_embeddings = model.encode(chunk, convert_to_tensor=True)
 
             _cos_scores = get_cos_scores(query_embedding, corpus_embeddings)
