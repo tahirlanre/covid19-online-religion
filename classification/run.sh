@@ -1,6 +1,6 @@
-python run_classifier.py --train_file data/reddit/sample/train.json \
-                        --validation_file data/reddit/sample/valid.json \
-                        --test_file data/reddit/sample/test.json \
+python run_classifier.py --train_file data/reddit/processed/train.json \
+                        --validation_file data/processed/sample/valid.json \
+                        --test_file data/reddit/processed/test.json \
                         --model_name_or_path bert-base-uncased \
                         --num_train_epochs 5 \
                         --output_dir saved_output \

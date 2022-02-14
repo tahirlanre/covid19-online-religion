@@ -351,7 +351,6 @@ def main():
 
                     logger.info(f"Saving model checkpoint to {ckpt_output_dir}")
 
-                    model_to_save = model.module if hasattr(model, "module") else model
                     model_to_save.save_pretrained(ckpt_output_dir)
                     tokenizer.save_pretrained(ckpt_output_dir)
                 
@@ -424,7 +423,7 @@ def main():
             y_pred = np.append(y_pred, outputs.logits.argmax(dim=-1).detach().cpu().numpy(), axis=0)
             y_true = np.append(y_true, batch["labels"].detach().cpu().numpy())
 
-    test_metric = classification_report(y_true, y_pred, target_names=label_list)
+    test_metric = classification_report(y_true, y_pred)
 
     output_test_file = os.path.join(output_dir, "test_results.txt")
     output_prediction_file = os.path.join(output_dir, "test_predictions.txt")
