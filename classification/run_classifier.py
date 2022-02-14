@@ -28,7 +28,7 @@ from transformers import (
     get_scheduler,
 )
 
-from classification.train_utils import (
+from train_utils import (
     init_logger,
     set_seed,
     compute_metrics
