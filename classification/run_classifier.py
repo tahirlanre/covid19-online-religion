@@ -351,6 +351,7 @@ def main():
 
                     logger.info(f"Saving model checkpoint to {ckpt_output_dir}")
 
+                    model_to_save = model.module if hasattr(model, "module") else model
                     model_to_save.save_pretrained(ckpt_output_dir)
                     tokenizer.save_pretrained(ckpt_output_dir)
                 
