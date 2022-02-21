@@ -1,39 +1,70 @@
+import logging
 import os
-import argparse
+from pathlib import Path
 
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import traceback
 import time
 import json
-import sys
+import pandas as pd
 
-# subreddit = "Islam"  # put the subreddit you want to download in the quotes
+url = "https://api.pushshift.io/reddit/{}/search?limit=1000&sort=desc&{}&after{}&before={}"
 
-url = "https://api.pushshift.io/reddit/{}/search?limit=1000&sort=desc&{}&before="
+logger = logging.getLogger(__name__)
 
 
-def downloadFromUrl(subreddit, object_type, start_time=None):
+def get_dates(start_date=None, end_date=None):
+    if start_date is not None:
+        start_date = pd.to_datetime(start_date).date()
+    else:
+        start_date = datetime(2011, 1, 1).date()
+
+    if end_date is not None:
+        end_date = pd.to_datetime(end_date).date()
+    else:
+        end_date = datetime.now().date()
+
+    dts = pd.date_range(start_date, end_date, freq="d").strftime("%Y-%m-%d").tolist()
+
+    return dts
+
+
+def get_dates_from_file(filename):
+    dts = []
+    with open(filename, "r") as f:
+        dts = f.read().split()
+    return dts
+
+
+def download_data(directory, subreddit, object_type, dt):
     filter_string = f"subreddit={subreddit}"
-    output_dir = f"./data/reddit/{subreddit}/"
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
-    fname = f"{'post' if object_type == 'submission' else object_type}.json"
-    output_file = os.path.join(output_dir, fname)
-    print(f"Saving {object_type}s to {output_file}")
+    download_path = os.path.join(directory, f"{dt}.json")
     count = 0
-    if start_time is None:
-        start_time = datetime.utcnow()
-    previous_epoch = int(start_time.timestamp())
+
+    start_time = datetime.fromisoformat(dt)
+    end_time = start_time + timedelta(days=1)
+
+    start_time = int(start_time.timestamp())
+    end_time = int(end_time.timestamp())
+
+    previous_epoch = end_time
 
     while True:
-        new_url = url.format(object_type, filter_string) + str(previous_epoch)
-        json_text = requests.get(
-            new_url, headers={"User-Agent": "Post downloader by Tahir"}
-        )
-        time.sleep(
-            1
-        )  # pushshift has a rate limit, if we send requests too fast it will start returning error messages
+        new_url = url.format(object_type, filter_string, start_time - 1, previous_epoch)
+        try:
+            json_text = requests.get(
+                new_url, headers={"User-Agent": "Post downloader by Tahir"}
+            )
+        except requests.exceptions.ChunkedEncodingError as e:
+            logger.info("sleeping for 60 secs .........")
+            time.sleep(60)
+            continue
+
+        # pushshift has a rate limit, if we send requests too fast it will start returning error messages
+        # logger.info("sleeping for 1 sec .........")
+        time.sleep(1)
+
         try:
             json_data = json_text.json()
         except json.decoder.JSONDecodeError:
@@ -45,7 +76,6 @@ def downloadFromUrl(subreddit, object_type, start_time=None):
         objects = json_data["data"]
         if len(objects) == 0:
             break
-
         for object in objects:
             previous_epoch = object["created_utc"] - 1
             count += 1
@@ -70,7 +100,7 @@ def downloadFromUrl(subreddit, object_type, start_time=None):
                     )
                     comment["author_flair_text"] = object["author_flair_text"]
                     comment["score"] = object["score"]
-                    with open(output_file, "a+") as filehandle:
+                    with open(download_path, "a+") as filehandle:
                         filehandle.write(f"{json.dumps(comment)}\n")
                 except Exception as err:
                     if "permalink" in object:
@@ -100,52 +130,30 @@ def downloadFromUrl(subreddit, object_type, start_time=None):
                         post["url"] = object["url"]
                         post["author_flair_text"] = object["author_flair_text"]
                         post["score"] = object["score"]
-                        with open(output_file, "a+") as filehandle:
+                        with open(download_path, "a+") as filehandle:
                             filehandle.write(f"{json.dumps(post)}\n")
                     except Exception as err:
                         print(f"Couldn't print post: {object['url']}")
                         print(traceback.format_exc())
 
-        print(
-            "Saved {} {}s through {}".format(
-                count,
-                object_type,
-                datetime.fromtimestamp(previous_epoch).strftime("%Y-%m-%d"),
-            )
+        if previous_epoch < start_time:
+            break
+
+    logger.info(
+        "Saved {} {}s through {}".format(
+            count,
+            object_type,
+            datetime.fromtimestamp(start_time).strftime("%Y-%m-%d"),
         )
-
-    print(f"Saved {count} {object_type}s")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Reddit downloader")
-    parser.add_argument(
-        "--subreddit", help="the subreddit you want to download", required=True
     )
-    parser.add_argument(
-        "--start_time",
-        type=datetime.fromisoformat,
-        help="time (in YYYY-MM-D format) to download from",
-    )
-    parser.add_argument(
-        "--post", help="download submissions from subreddit", action="store_true"
-    )
-    parser.add_argument(
-        "--comment", help="download comments from subbredit", action="store_true"
-    )
-    args = parser.parse_args()
 
-    subreddit = args.subreddit
-    start_time = args.start_time
+    # logger.info(f"")
 
-    if args.post == False and args.comment == False:
-        raise ValueError(
-            "Need to select either submissions or comments to download from subredit"
-        )
 
-    if args.post:
-        print(f"Downloading posts from {subreddit} subreddit")
-        downloadFromUrl(subreddit, "submission", start_time=start_time)
-    if args.comment:
-        print(f"Downloading comments from {subreddit} subreddit")
-        downloadFromUrl(subreddit, "comment", start_time)
+def setup_download_dir(subreddit, object_type):
+    download_dir = Path(
+        f"../data/reddit/{subreddit}/{'post' if object_type == 'submission' else object_type}"
+    )
+    if not download_dir.exists():
+        download_dir.mkdir(parents=True, exist_ok=True)
+    return download_dir
