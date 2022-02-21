@@ -105,6 +105,24 @@ def get_mixed_loss(dict_loss):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "--source_train_file",
+        type=str,
+        default=None,
+        help="A csv or a json file contatining the training source data.",
+    )
+    parser.add_argument(
+        "--source_validation_file",
+        type=str,
+        default=None,
+        help="A csv or a json file containing the validation sourcr data.",
+    )
+    parser.add_argument(
+        "--target_train_file",
+        type=str,
+        default=None,
+        help="A csv or a json file containing the training target data.",
+    )
+    parser.add_argument(
         "--max_length",
         type=int,
         default=50,
@@ -210,10 +228,11 @@ def main():
     )
 
     data_files = {}
-    data_files["source_validation"] = "../data/reddit/sample/dev.json"
-    data_files["source_train"] = "../data/reddit/sample/train.json"
-    data_files["target_train"] = "../data/twitter/UK/2020/sample/train.json"
-    raw_datasets = load_dataset("json", data_files=data_files)
+    data_files["source_train"] = args.source_train_file
+    data_files["source_validation"] = args.source_validation_file
+    data_files["target_train"] = args.target_train_file
+    extension = (args.source_train_file).split(".")[-1]
+    raw_datasets = load_dataset(extension, data_files=data_files)
 
     label_list = raw_datasets["source_train"].unique("label")
     label_list.sort()
@@ -232,7 +251,6 @@ def main():
 
     wandb.login()
     wandb.init(project="religion-da", config=model.config)
-
 
     padding = "max_length" if args.pad_to_max_length else False
 
@@ -264,7 +282,6 @@ def main():
 
     target_train_dataset = processed_datasets["target_train"]
     source_train_dataset = processed_datasets["source_train"]
-    source_train_dataset = source_train_dataset.select(range(200))
     source_eval_dataset = processed_datasets["source_validation"]
 
     source_collate_fn = default_data_collator
@@ -400,26 +417,26 @@ def main():
 
                 dict_loss = defaultdict(float)
 
-        model.eval()
         eval_loss = 0.0
-
         y_pred = None
         y_true = None
-        for step, batch in enumerate(eval_dataloader):
-            batch = {k: batch[k].to(device) for k in batch}
-            loss, output = model(**batch)
-            eval_loss += loss.item()
 
-            logits = output
-            if y_pred is None:
-                y_pred = logits.argmax(dim=-1).detach().cpu().numpy()
-                y_true = batch["labels"].detach().cpu().numpy()
-            else:
-                y_pred = np.append(
-                    y_pred, logits.argmax(dim=-1).detach().cpu().numpy(), axis=0
-                )
-                y_true = np.append(y_true, batch["labels"].detach().cpu().numpy())
+        model.eval()
+        with torch.no_grad():
+            for step, batch in enumerate(eval_dataloader):
+                batch = {k: batch[k].to(device) for k in batch}
+                loss, output = model(**batch)
+                eval_loss += loss.item()
 
+                logits = output
+                if y_pred is None:
+                    y_pred = logits.argmax(dim=-1).detach().cpu().numpy()
+                    y_true = batch["labels"].detach().cpu().numpy()
+                else:
+                    y_pred = np.append(
+                        y_pred, logits.argmax(dim=-1).detach().cpu().numpy(), axis=0
+                    )
+                    y_true = np.append(y_true, batch["labels"].detach().cpu().numpy())
 
         eval_loss = eval_loss / len(eval_dataloader)
         logger.info(f"Eval loss: {eval_loss}")
@@ -446,7 +463,6 @@ def main():
                 f_w.write(eval_metric + "\n")
                 # logger.info(f"{eval_metric}")
                 f_w.write(f" eval_loss = {eval_loss}")
-
 
         if eval_loss < best_val_loss:
             if args.output_dir is not None:
