@@ -1,8 +1,9 @@
+from asyncio.log import logger
 from pathlib import Path
 import os
-from time import time
 from concurrent.futures import ProcessPoolExecutor
 from itertools import chain
+import logging
 
 import json
 import modin.pandas as pd
@@ -10,6 +11,12 @@ import numpy as np
 
 from emoji import demojize
 from nltk.tokenize import TweetTokenizer
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 tokenizer = TweetTokenizer()
 
@@ -21,7 +28,7 @@ def create_and_save_splits(data, dir_to_save_splits, train_dev_split=(80, 20)):
     num_train = int((train_dev_split[0] / 100) * len(data))
     train, dev = np.split(data.sample(frac=1, random_state=42), [num_train])
 
-    print("***** Saving tweet texts to file *****")
+    logger.info("***** Saving tweet texts to file *****")
     train_path = os.path.join(dir_to_save_splits, "train.txt")
     dev_path = os.path.join(dir_to_save_splits, "dev.txt")
 
@@ -54,29 +61,42 @@ def preprocess_tweet(tweet):
     return " ".join(tokens)
 
 
-def get_all_tweet_texts(filename):
+def get_all_tweet_texts(filepath):
     texts = []
-    with open(filename, "r") as f:
+    with open(filepath, "r") as f:
         for line in f:
             tweet_obj = json.loads(line)
             if "text" in tweet_obj:
                 text = tweet_obj["text"]
                 if not filter_text(text):
                     texts.append(preprocess_tweet(text))
+    logger.info(f"done getting tweet texts from {filepath.name}")
     return texts
 
+
 def main():
-    month = "09"
-    data_dir = Path(
-        f"/home/zqxh49/Development/phd/covid19-online-religion/data/twitter/UK/2019/{month}/raw/"
+    month = "07"
+    year = "2020"
+    data1 = Path(
+        f"/home/zqxh49/Development/phd/covid19-online-religion/data/twitter/UK/{year}/{month}/raw/replies/"
     )
-    output_dir = Path(f"/home/zqxh49/Development/phd/covid19-online-religion/data/twitter/UK/2019/{month}/")
+    data2 = Path(
+        f"/media/zqxh49/C28AAF378AAF273F/PHD/data/Covid-19/UK/{year}/{month}-{year}/"
+    )
+    output_dir = Path(
+        f"/home/zqxh49/Development/phd/covid19-online-religion/data/twitter/UK/{year}/{month}/"
+    )
 
-    filenames = data_dir.glob("*.jsonl")
+    filepaths = []
+    filepaths.append(data1.glob("*.jsonl"))
+    filepaths.append(data2.glob(f"*-{month}-*.jsonl"))
+    filepaths = list(chain(*filepaths))
 
-    print("***** Getting all tweet texts *****")
+    logger.info(f"***** Total no of filepaths: {len(filepaths)} *****")
+
+    logger.info("***** Getting all tweet texts *****")
     with ProcessPoolExecutor() as executor:
-        texts = executor.map(get_all_tweet_texts, filenames)
+        texts = executor.map(get_all_tweet_texts, filepaths)
 
     df = pd.DataFrame(list(chain(*texts)))
     df.columns = ["text"]

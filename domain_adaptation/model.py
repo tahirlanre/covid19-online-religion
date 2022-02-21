@@ -54,7 +54,7 @@ class DoubleHeadBert(BertPreTrainedModel):
                 else:
                     loss_fct = CrossEntropyLoss()
                     loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-            output = (logits,) #+ outputs[2:]
+            output = (logits,)  # + outputs[2:]
             return ((loss,) + output) if loss is not None else output
         else:
             total_loss = None
@@ -64,7 +64,7 @@ class DoubleHeadBert(BertPreTrainedModel):
                     prediction_scores.view(-1, self.config.vocab_size), labels.view(-1)
                 )
                 total_loss = masked_lm_loss
-        
+
             output = (prediction_scores,) + outputs[2:]
             return ((total_loss,) + output) if total_loss is not None else output
 

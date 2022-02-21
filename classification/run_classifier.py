@@ -28,15 +28,12 @@ from transformers import (
     get_scheduler,
 )
 
-from train_utils import (
-    init_logger,
-    set_seed,
-    compute_metrics
-)
+from train_utils import init_logger, set_seed, compute_metrics
 
 import wandb
 
 logger = logging.getLogger(__name__)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -149,6 +146,7 @@ def parse_args():
 
     return args
 
+
 def main():
     args = parse_args()
 
@@ -182,7 +180,7 @@ def main():
         config=config,
     )
 
-    special_tokens_dict = {'additional_special_tokens': ['[URL]']}
+    special_tokens_dict = {"additional_special_tokens": ["[URL]"]}
     tokenizer.add_special_tokens(special_tokens_dict)
     model.resize_token_embeddings(len(tokenizer))
 
@@ -310,11 +308,13 @@ def main():
     global_step = 0
     best_val_loss = float("inf")
 
-    run_name = wandb.run.name if wandb.run else datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    run_name = (
+        wandb.run.name if wandb.run else datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    )
     if args.output_dir:
         output_dir = os.path.join(args.output_dir, run_name)
 
-    train_loss = 0.
+    train_loss = 0.0
     for epoch in range(args.num_train_epochs):
         model.train()
         for step, batch in enumerate(train_dataloader):
@@ -346,7 +346,9 @@ def main():
                         shutil.rmtree(checkpoint)
 
                     # Save model checkpoint
-                    ckpt_output_dir = os.path.join(output_dir, f"checkpoint-{global_step}")
+                    ckpt_output_dir = os.path.join(
+                        output_dir, f"checkpoint-{global_step}"
+                    )
                     os.makedirs(ckpt_output_dir, exist_ok=True)
 
                     logger.info(f"Saving model checkpoint to {ckpt_output_dir}")
@@ -354,12 +356,12 @@ def main():
                     model_to_save = model.module if hasattr(model, "module") else model
                     model_to_save.save_pretrained(ckpt_output_dir)
                     tokenizer.save_pretrained(ckpt_output_dir)
-                
+
                 # log interval loss
                 cur_loss = train_loss / args.save_steps
                 wandb.log({"train_loss": cur_loss})
-                train_loss = 0.
-                
+                train_loss = 0.0
+
             # if global_step >= args.max_train_steps:
             #     break
 
@@ -376,7 +378,9 @@ def main():
                 y_pred = outputs.logits.argmax(dim=-1).detach().cpu().numpy()
                 y_true = batch["labels"].detach().cpu().numpy()
             else:
-                y_pred = np.append(y_pred, outputs.logits.argmax(dim=-1).detach().cpu().numpy(), axis=0)
+                y_pred = np.append(
+                    y_pred, outputs.logits.argmax(dim=-1).detach().cpu().numpy(), axis=0
+                )
                 y_true = np.append(y_true, batch["labels"].detach().cpu().numpy())
 
         eval_metric = compute_metrics(y_true, y_pred)
@@ -414,15 +418,20 @@ def main():
 
     y_pred = None
     y_true = None
-    for step, batch in enumerate(test_dataloader):
-        batch.to(device)
-        outputs = best_model(**batch)
-        if y_pred is None:
+
+    best_model.eval()
+    with torch.no_grad():
+        for step, batch in enumerate(test_dataloader):
+            batch.to(device)
+            outputs = best_model(**batch)
+            if y_pred is None:
                 y_pred = outputs.logits.argmax(dim=-1).detach().cpu().numpy()
                 y_true = batch["labels"].detach().cpu().numpy()
-        else:
-            y_pred = np.append(y_pred, outputs.logits.argmax(dim=-1).detach().cpu().numpy(), axis=0)
-            y_true = np.append(y_true, batch["labels"].detach().cpu().numpy())
+            else:
+                y_pred = np.append(
+                    y_pred, outputs.logits.argmax(dim=-1).detach().cpu().numpy(), axis=0
+                )
+                y_true = np.append(y_true, batch["labels"].detach().cpu().numpy())
 
     test_metric = classification_report(y_true, y_pred)
 
