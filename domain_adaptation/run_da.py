@@ -305,6 +305,8 @@ def main():
         collate_fn=collate_fn,
     )
 
+    args.gradient_accumulation_steps = circle + 1
+
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
     no_decay = ["bias", "LayerNorm.weight"]
