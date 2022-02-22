@@ -157,7 +157,7 @@ def parse_args():
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=5e-5,
+        default=1e-5,
         help="Initial learning rate (after the potential warmup period) to use.",
     )
     parser.add_argument(
@@ -203,6 +203,12 @@ def parse_args():
         type=int,
         default=100,
         help="Number of updates steps before two checkpoint saves",
+    )
+    parser.add_argument(
+        "--logging_steps",
+        type=int,
+        default=50,
+        help="Number of update steps between two logs",
     )
     parser.add_argument(
         "--cuda",
@@ -360,6 +366,7 @@ def main():
     logger.info(f"  Total optimization steps = {max_train_steps}")
     progress_bar = tqdm(range(max_train_steps))
     global_step = 0
+    tr_loss = 0.0
     best_val_loss = float("inf")
 
     run_name = (
@@ -369,7 +376,6 @@ def main():
         output_dir = os.path.join(args.output_dir, run_name)
 
     train_loss = 0.0
-    dict_loss = defaultdict(float)
 
     for epoch in range(args.num_train_epochs):
         model.train()
@@ -377,10 +383,9 @@ def main():
             batch = {k: batch[k].to(device) for k in batch}
             loss, output = model(**batch)
             loss = loss / args.gradient_accumulation_steps
-            domain = batch["domain"][0].item()
-            dict_loss[domain] += loss.item()
 
             loss.backward()
+            train_loss += loss.item()
             if (
                 step % args.gradient_accumulation_steps == 0
                 or step == len(train_dataloader) - 1
@@ -391,33 +396,33 @@ def main():
                 progress_bar.update(1)
                 global_step += 1
 
-            if args.save_steps > 0 and global_step % args.save_steps == 0:
-                if args.output_dir is not None:
-                    # delete older checkpoint(s)
-                    glob_checkpoints = [
-                        str(x) for x in Path(output_dir).glob(f"checkpoint-*")
-                    ]
+                if args.logging_steps > 0 and global_step % args.logging_steps == 0:
+                    wandb.log({"train_loss": train_loss / global_step})
 
-                    for checkpoint in glob_checkpoints:
-                        logger.info(f"Deleting older checkpoint {checkpoint}")
-                        shutil.rmtree(checkpoint)
+                if args.save_steps > 0 and global_step % args.save_steps == 0:
+                    if args.output_dir is not None:
+                        # delete older checkpoint(s)
+                        glob_checkpoints = [
+                            str(x) for x in Path(output_dir).glob(f"checkpoint-*")
+                        ]
 
-                    # Save model checkpoint
-                    ckpt_output_dir = os.path.join(
-                        output_dir, f"checkpoint-{global_step}"
-                    )
-                    os.makedirs(ckpt_output_dir, exist_ok=True)
+                        for checkpoint in glob_checkpoints:
+                            logger.info(f"Deleting older checkpoint {checkpoint}")
+                            shutil.rmtree(checkpoint)
 
-                    logger.info(f"Saving model checkpoint to {ckpt_output_dir}")
+                        # Save model checkpoint
+                        ckpt_output_dir = os.path.join(
+                            output_dir, f"checkpoint-{global_step}"
+                        )
+                        os.makedirs(ckpt_output_dir, exist_ok=True)
 
-                    model_to_save = model.module if hasattr(model, "module") else model
-                    model_to_save.save_pretrained(ckpt_output_dir)
-                    tokenizer.save_pretrained(ckpt_output_dir)
+                        logger.info(f"Saving model checkpoint to {ckpt_output_dir}")
 
-                wandb.log({"source_train_loss": dict_loss[0] / args.save_steps})
-                wandb.log({"target_train_loss": dict_loss[1] / args.save_steps})
-
-                dict_loss = defaultdict(float)
+                        model_to_save = (
+                            model.module if hasattr(model, "module") else model
+                        )
+                        model_to_save.save_pretrained(ckpt_output_dir)
+                        tokenizer.save_pretrained(ckpt_output_dir)
 
         eval_loss = 0.0
         y_pred = None
@@ -457,13 +462,7 @@ def main():
                 logger.info(
                     f"*****  Evaluation results on eval dataset - Epoch: {epoch+1} *****"
                 )
-                # for key in sorted(eval_metric.keys()):
-                #     logger.info(f" {key} = {str(eval_metric[key])}")
-                #     f_w.write(f" {key} = {str(eval_metric[key])}\n")
-                # logger.info(f" eval_loss = {eval_loss}")
-                # f_w.write(f" eval_loss = {eval_loss}\n")
                 f_w.write(eval_metric + "\n")
-                # logger.info(f"{eval_metric}")
                 f_w.write(f" eval_loss = {eval_loss}")
 
         if eval_loss < best_val_loss:
