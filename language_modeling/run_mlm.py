@@ -5,6 +5,7 @@ from itertools import chain
 import random
 import math
 from datetime import datetime
+from pathlib import Path
 
 import transformers
 from transformers import (
@@ -49,6 +50,12 @@ def parse_args():
         type=str,
         default=None,
         help="A csv or a json file contatining the training data.",
+    )
+    parser.add_argument(
+        "--train_dir",
+        type=str,
+        default=None,
+        help="A directory contatining the training files.",
     )
     parser.add_argument(
         "--validation_file",
@@ -152,7 +159,7 @@ def parse_args():
     parser.add_argument(
         "--max_seq_length",
         type=int,
-        default=None,
+        default=128,
         help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated.",
     )
     parser.add_argument(
@@ -205,6 +212,9 @@ def parse_args():
         if extension not in ["csv", "json", "txt"]:
             raise ValueError("`validation_file` should be a csv, json or txt file.")
 
+    if args.train_file is None and args.train_dir is None:
+        raise ValueError("please provice 'train_dir' or 'train_file'")
+
     return args
 
 
@@ -225,28 +235,36 @@ def main():
     if args.seed is not None:
         set_seed(args.seed)
 
-    data_files = {}
     if args.train_file is not None:
+        data_files = {}
         data_files["train"] = args.train_file
-    if args.validation_file is not None:
-        data_files["validation"] = args.validation_file
-    extension = args.train_file.split(".")[-1]
-    if extension == "txt":
-        extension = "text"
-    raw_datasets = load_dataset(extension, data_files=data_files)
+        if args.validation_file is not None:
+            data_files["validation"] = args.validation_file
+        extension = args.train_file.split(".")[-1]
+        if extension == "txt":
+            extension = "text"
+        raw_datasets = load_dataset(extension, data_files=data_files)
+    else:
+        extension = "json"
+        data_files = [str(path) for path in Path(args.train_dir).glob("*/data.json")]
+        raw_datasets = load_dataset(extension, data_files=data_files)
+
 
     # If no validation data is there, validation_split_percentage will be used to divide the dataset.
-    # if "validation" not in raw_datasets.keys():
-    #     raw_datasets["validation"] = load_dataset(
-    #         extension,
-    #         data_files=data_files,
-    #         split=f"train[:{args.validation_split_percentage}%]"
-    #     )
-    #     raw_datasets["train"] = load_dataset(
-    #         extension,
-    #         data_files=data_files,
-    #         split=f"train[{args.validation_split_percentage}%:]"
-    #     )
+    if "validation" not in raw_datasets.keys():
+        raw_datasets["validation"] = load_dataset(
+            extension,
+            data_files=data_files,
+            split=f"train[:{args.validation_split_percentage}%]"
+        )
+        raw_datasets["train"] = load_dataset(
+            extension,
+            data_files=data_files,
+            split=f"train[{args.validation_split_percentage}%:]"
+        )
+
+    if "label" in raw_datasets["train"].column_names:
+        raw_datasets = raw_datasets.remove_columns("label")
 
     if args.config_name:
         config = AutoConfig.from_pretrained(args.config_name)
