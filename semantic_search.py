@@ -1,27 +1,32 @@
 import os
 import logging
 from pathlib import Path
+import json
 
 from sentence_transformers import SentenceTransformer, util
 import torch
+
+from utils.utils import init_logger
 
 model = SentenceTransformer("all-mpnet-base-v2")
 
 MAX_CORPUS_SIZE = 1000000
 
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-    datefmt="%m/%d/%Y %H:%M:%S",
-    level=logging.INFO,
-)
-
 logger = logging.getLogger(__name__)
+init_logger()
 
 
 def read(fpath):
     texts = []
+    i = 0
     with open(fpath, "r") as f:
-        texts = f.read().splitlines()
+        for line in f:
+            obj = json.loads(line)
+            text = obj["text"]
+            texts.append(text)
+            i += 1
+            if i == 100:
+                break
     return texts
 
 
@@ -40,18 +45,19 @@ def get_cos_scores(query_embedding, corpus_embeddings):
 
 
 def main():
-    label = "sample"
-    input_path = f"./data/reddit/keys_{label}.txt"
+    label = "islam"
+    input_path = f"./data/reddit/processed/{label}.json"
     query_path = (
-        f"./data/reddit/queries_{label}.txt"
+        f"./data/reddit/interim/queries_{label}.txt"
         if label == "islam"
-        else "./data/reddit/queries.txt"
+        else "./data/reddit/interim/queries.txt"
     )
 
-    output_path = f"./data/reddit/cos_scores_{label}.txt"
+    output_path = f"./data/reddit/interim/cos_scores_{label}.txt"
 
     logger.info(f" Reading query sentences from {query_path}")
-    queries = read(query_path)
+    with open(query_path, "r") as f:
+        queries = f.read().splitlines()
     query_embedding = model.encode(queries, convert_to_tensor=True)
     logger.info(f" Size of query sentences: {len(queries)}")
 

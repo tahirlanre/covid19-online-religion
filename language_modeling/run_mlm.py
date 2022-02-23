@@ -34,7 +34,7 @@ import torch
 from tqdm.auto import tqdm
 from torch.utils.data import DataLoader
 
-from utils import save_checkpoint
+from utils.train import save_checkpoint
 
 import wandb
 
@@ -249,18 +249,17 @@ def main():
         data_files = [str(path) for path in Path(args.train_dir).glob("*/data.json")]
         raw_datasets = load_dataset(extension, data_files=data_files)
 
-
     # If no validation data is there, validation_split_percentage will be used to divide the dataset.
     if "validation" not in raw_datasets.keys():
         raw_datasets["validation"] = load_dataset(
             extension,
             data_files=data_files,
-            split=f"train[:{args.validation_split_percentage}%]"
+            split=f"train[:{args.validation_split_percentage}%]",
         )
         raw_datasets["train"] = load_dataset(
             extension,
             data_files=data_files,
-            split=f"train[{args.validation_split_percentage}%:]"
+            split=f"train[{args.validation_split_percentage}%:]",
         )
 
     if "label" in raw_datasets["train"].column_names:

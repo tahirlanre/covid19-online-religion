@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 
-from train_utils import init_logger
+from utils.train import init_logger
 
 logger = logging.getLogger(__name__)
 

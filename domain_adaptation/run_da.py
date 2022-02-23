@@ -35,7 +35,7 @@ from model import DoubleHeadBert
 
 import wandb
 
-from train_utils import compute_metrics
+from utils.train import compute_metrics
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
@@ -123,9 +123,9 @@ def parse_args():
         help="A csv or a json file containing the training target data.",
     )
     parser.add_argument(
-        "--max_length",
+        "--max_seq_length",
         type=int,
-        default=50,
+        default=128,
         help=(
             "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated,"
             " sequences shorter will be padded if `--pad_to_max_lengh` is passed."
@@ -263,7 +263,7 @@ def main():
     def preprocess_function(examples):
         texts = (examples["text"],)
         result = tokenizer(
-            *texts, padding=padding, max_length=args.max_length, truncation=True
+            *texts, padding=padding, max_length=args.max_seq_length, truncation=True
         )
         if "label" in examples:
             if label_to_id is not None:

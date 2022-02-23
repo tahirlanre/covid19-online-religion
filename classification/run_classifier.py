@@ -28,7 +28,7 @@ from transformers import (
     get_scheduler,
 )
 
-from train_utils import init_logger, set_seed, compute_metrics
+from utils.train import init_logger, set_seed, compute_metrics
 
 import wandb
 
@@ -58,7 +58,7 @@ def parse_args():
         help="A csv or a json file containing the test data.",
     )
     parser.add_argument(
-        "--max_length",
+        "--max_seq_length",
         type=int,
         default=50,
         help=(
@@ -199,7 +199,7 @@ def main():
     def preprocess_function(examples):
         texts = (examples["text"],)
         result = tokenizer(
-            *texts, padding=padding, max_length=args.max_length, truncation=True
+            *texts, padding=padding, max_length=args.max_seq_length, truncation=True
         )
 
         if "label" in examples:
