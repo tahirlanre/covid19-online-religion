@@ -18,15 +18,11 @@ init_logger()
 
 def read(fpath):
     texts = []
-    i = 0
     with open(fpath, "r") as f:
         for line in f:
             obj = json.loads(line)
             text = obj["text"]
             texts.append(text)
-            i += 1
-            if i == 100:
-                break
     return texts
 
 
