@@ -3,27 +3,19 @@ import logging
 from time import time
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
-
+import itertools
 import json
-import numpy as np
-import modin.pandas as pd
 import math
 
-import itertools
-
+import numpy as np
+import modin.pandas as pd
 import re
 import string
 from nltk.tokenize import TweetTokenizer, word_tokenize
 import emoji
 
 from utils.utils import init_logger, log_step
-
 from preprocess.preprocess import preprocess_text
-
-import ray
-
-ray.shutdown()
-ray.init()
 
 logger = logging.getLogger(__name__)
 init_logger()
