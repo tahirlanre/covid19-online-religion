@@ -147,8 +147,6 @@ def download_data(directory, subreddit, object_type, dt):
         )
     )
 
-    # logger.info(f"")
-
 
 def setup_download_dir(subreddit, object_type):
     download_dir = Path(

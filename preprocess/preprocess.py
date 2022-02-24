@@ -8,9 +8,11 @@ Default preprocessing code for all model training.
 import re
 import regex
 from emoji import UNICODE_EMOJI
+import json
 
 ## Local Modules
 from .tokenizer import Tokenizer
+
 
 emoji_regex = regex.compile(
     r"\L<words>", words=[emoji for emoji in UNICODE_EMOJI["en"]]
@@ -284,3 +286,17 @@ def has_hashtag(text):
 def has_emoji(text):
     if emoji_regex.search(text):
         return True
+    return False
+
+
+def get_all_tweet_texts(filepath):
+    texts = []
+    with open(filepath, "r") as f:
+        for line in f:
+            tweet_obj = json.loads(line)
+            if "text" in tweet_obj:
+                text = tweet_obj["text"]
+                text = preprocess_text(text)
+                if text:
+                    texts.append(text)
+    return texts

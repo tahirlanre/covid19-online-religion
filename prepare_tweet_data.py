@@ -3,32 +3,17 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 from itertools import chain
 import logging
-import json
 
 import modin.pandas as pd
 import ray
 
-from preprocess.preprocess import preprocess_text
-from utils import init_logger
+from preprocess.preprocess import get_all_tweet_texts
+from utils.utils import init_logger
 
 ray.init()
 
 init_logger()
 logger = logging.getLogger(__name__)
-
-
-def get_all_tweet_texts(filepath):
-    texts = []
-    with open(filepath, "r") as f:
-        for line in f:
-            tweet_obj = json.loads(line)
-            if "text" in tweet_obj:
-                text = tweet_obj["text"]
-                text = preprocess_text(text)
-                if text:
-                    texts.append(text)
-    logger.info(f"done getting tweet texts from {filepath.name}")
-    return texts
 
 
 month = "07"

@@ -74,6 +74,9 @@ def parse_args():
     parser.add_argument(
         "--output_file", type=str, help="Path to store predictions", required=True
     )
+    args = parser.parse_args()
+
+    return args
 
 
 def main():

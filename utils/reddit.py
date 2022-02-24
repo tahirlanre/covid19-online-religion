@@ -223,9 +223,12 @@ def add_cos_score(dataf, fpath):
 
 @log_step
 def filter_cos_score(dataf, frac):
-    top_k = math.ceil((frac * len(dataf)))
+    if frac > 1:
+        top_k = frac
+    else:
+        top_k = math.ceil((frac * len(dataf)))
     dataf.sort_values(by=["cos_score"], ascending=False, inplace=True)
-    return dataf.iloc[: top_k + 1]
+    return dataf.iloc[:top_k]
 
 
 @log_step

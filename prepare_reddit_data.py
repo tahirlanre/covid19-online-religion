@@ -2,22 +2,19 @@ import logging
 from pathlib import Path
 from time import time
 from concurrent.futures import ProcessPoolExecutor
-
+import re
 import json
 from itertools import chain
+
 import modin.pandas as pd
 import ray
 
-import re
+from utils.utils import init_logger
 
 ray.init()
 
-
-logging.basicConfig(
-    level=logging.info, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-
 logger = logging.getLogger(__name__)
+init_logger()
 
 
 def read_json_data(path):
