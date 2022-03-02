@@ -41,13 +41,9 @@ def get_cos_scores(query_embedding, corpus_embeddings):
 
 
 def main():
-    label = "islam"
+    label = "yoga"
     input_path = f"./data/reddit/processed/{label}.json"
-    query_path = (
-        f"./data/reddit/interim/queries_{label}.txt"
-        if label == "islam"
-        else "./data/reddit/interim/queries.txt"
-    )
+    query_path = f"./data/reddit/interim/queries_{label}.txt"
 
     output_path = f"./data/reddit/interim/cos_scores_{label}.txt"
 
