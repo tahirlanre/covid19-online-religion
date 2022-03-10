@@ -28,6 +28,7 @@ import os
 import random
 from itertools import chain
 from pathlib import Path
+from datetime import datetime
 
 import datasets
 import torch
@@ -82,6 +83,12 @@ def parse_args():
         type=str,
         default=None,
         help="The configuration name of the dataset to use (via the datasets library).",
+    )
+    parser.add_argument(
+        "--train_dir",
+        type=str,
+        default=None,
+        help="A directory contatining the training files.",
     )
     parser.add_argument(
         "--train_file",
@@ -322,46 +329,31 @@ def main():
     #
     # In distributed training, the load_dataset function guarantee that only one local process can concurrently
     # download the dataset.
-    if args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        raw_datasets = load_dataset(args.dataset_name, args.dataset_config_name)
-        if "validation" not in raw_datasets.keys():
-            raw_datasets["validation"] = load_dataset(
-                args.dataset_name,
-                args.dataset_config_name,
-                split=f"train[:{args.validation_split_percentage}%]",
-            )
-            raw_datasets["train"] = load_dataset(
-                args.dataset_name,
-                args.dataset_config_name,
-                split=f"train[{args.validation_split_percentage}%:]",
-            )
-    else:
+    if args.train_file is not None:
         data_files = {}
-        dataset_args = {}
-        if args.train_file is not None:
-            data_files["train"] = args.train_file
+        data_files["train"] = args.train_file
         if args.validation_file is not None:
             data_files["validation"] = args.validation_file
         extension = args.train_file.split(".")[-1]
         if extension == "txt":
             extension = "text"
-            dataset_args["keep_linebreaks"] = not args.no_keep_linebreaks
-        raw_datasets = load_dataset(extension, data_files=data_files, **dataset_args)
+        raw_datasets = load_dataset(extension, data_files=data_files)
+    else:
+        extension = "json"
+        data_files = [str(path) for path in Path(args.train_dir).glob("*/data.json")]
+        raw_datasets = load_dataset(extension, data_files=data_files)
         # If no validation data is there, validation_split_percentage will be used to divide the dataset.
-        if "validation" not in raw_datasets.keys():
-            raw_datasets["validation"] = load_dataset(
-                extension,
-                data_files=data_files,
-                split=f"train[:{args.validation_split_percentage}%]",
-                **dataset_args,
-            )
-            raw_datasets["train"] = load_dataset(
-                extension,
-                data_files=data_files,
-                split=f"train[{args.validation_split_percentage}%:]",
-                **dataset_args,
-            )
+    if "validation" not in raw_datasets.keys():
+        raw_datasets["validation"] = load_dataset(
+            extension,
+            data_files=data_files,
+            split=f"train[:{args.validation_split_percentage}%]",
+        )
+        raw_datasets["train"] = load_dataset(
+            extension,
+            data_files=data_files,
+            split=f"train[{args.validation_split_percentage}%:]",
+        )
 
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
@@ -451,7 +443,6 @@ def main():
     #
     # To speed up this part, we use multiprocessing. See the documentation of the map method for more information:
     # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.Dataset.map
-
     with accelerator.main_process_first():
         lm_datasets = tokenized_datasets.map(
             group_texts,
@@ -480,6 +471,10 @@ def main():
         collate_fn=default_data_collator,
         batch_size=args.per_device_eval_batch_size,
     )
+
+    import pdb
+
+    pdb.set_trace()
 
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.
@@ -560,7 +555,9 @@ def main():
     best_metric = float("inf")
 
     run_name = (
-        wandb.run.name if wandb.run else datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+        wandb.run.name
+        if wandb.run.name
+        else datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
     )
     if args.output_dir:
         args.output_dir = os.path.join(args.output_dir, run_name)

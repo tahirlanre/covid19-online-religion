@@ -213,7 +213,7 @@ def parse_args():
             raise ValueError("`validation_file` should be a csv, json or txt file.")
 
     if args.train_file is None and args.train_dir is None:
-        raise ValueError("please provice 'train_dir' or 'train_file'")
+        raise ValueError("please provide 'train_dir' or 'train_file'")
 
     return args
 
