@@ -44,12 +44,13 @@ from transformers import (
     MODEL_MAPPING,
     AdamW,
     AutoConfig,
-    AutoModelForCausalLM,
+    # AutoModelForCausalLM,
     AutoTokenizer,
     SchedulerType,
     default_data_collator,
     get_scheduler,
     set_seed,
+    GPT2LMHeadModel,
 )
 from transformers.file_utils import get_full_repo_name
 from transformers.utils.versions import require_version
@@ -99,16 +100,16 @@ def parse_args():
         default=5,
         help="The percentage of the train set used as validation set in case there's no validation split",
     )
-    parser.add_argument(
-        "--model_name_or_path",
-        type=str,
-        help="Path to pretrained model or model identifier from huggingface.co/models.",
-        required=True,
-    )
+    # parser.add_argument(
+    #     "--model_name_or_path",
+    #     type=str,
+    #     help="Path to pretrained model or model identifier from huggingface.co/models.",
+    #     required=True,
+    # )
     parser.add_argument(
         "--config_name",
         type=str,
-        default=None,
+        default=True,
         help="Pretrained config name or path if not the same as model_name",
     )
     parser.add_argument(
@@ -367,39 +368,26 @@ def main():
 
     # Load pretrained model and tokenizer
     #
-    # In distributed training, the .from_pretrained methods guarantee that only one local process can concurrently
-    # download model & vocab.
-    if args.config_name:
-        config = AutoConfig.from_pretrained(args.config_name)
-    elif args.model_name_or_path:
-        config = AutoConfig.from_pretrained(args.model_name_or_path)
-    else:
-        config = CONFIG_MAPPING[args.model_type]()
-        logger.warning("You are instantiating a new config instance from scratch.")
+
+    context_length = args.block_size
 
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(
             args.tokenizer_name, use_fast=not args.use_slow_tokenizer
         )
-    elif args.model_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(
-            args.model_name_or_path, use_fast=not args.use_slow_tokenizer
-        )
     else:
-        raise ValueError(
-            "You are instantiating a new tokenizer from scratch. This is not supported by this script."
-            "You can do it from another script, save it, and load it from here, using --tokenizer_name."
-        )
+        tokenizer = AutoTokenizer.from_pretrained(args.config_name)
 
-    if args.model_name_or_path:
-        model = AutoModelForCausalLM.from_pretrained(
-            args.model_name_or_path,
-            from_tf=bool(".ckpt" in args.model_name_or_path),
-            config=config,
-        )
-    else:
-        logger.info("Training new model from scratch")
-        model = AutoModelForCausalLM.from_config(config)
+    config = AutoConfig.from_pretrained(
+        args.config_name,
+        vocab_size=len(tokenizer),
+        n_ctx=context_length,
+        bos_token_id=tokenizer.bos_token_id,
+        eos_token_id=tokenizer.eos_token_id,
+    )
+
+    logger.info("Training new model from scratch")
+    model = GPT2LMHeadModel(config)
 
     model.resize_token_embeddings(len(tokenizer))
 
