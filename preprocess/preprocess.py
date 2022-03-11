@@ -300,3 +300,16 @@ def get_all_tweet_texts(filepath):
                 if text:
                     texts.append(text)
     return texts
+
+
+def get_tweet_data(filepath, columns=["text", "created_at"]):
+    data = []
+    with open(filepath, "r") as f:
+        for line in f:
+            t = tuple()
+            tweet_obj = json.loads(line)
+            for col in columns:
+                if col in tweet_obj:
+                    t += (tweet_obj[col],)
+            data.append(t)
+    return data

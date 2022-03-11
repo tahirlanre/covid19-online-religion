@@ -251,8 +251,11 @@ def parse_args():
         args.dataset_name is None
         and args.train_file is None
         and args.validation_file is None
+        and args.train_dir is None
     ):
-        raise ValueError("Need either a dataset name or a training/validation file.")
+        raise ValueError(
+            "Need either a dataset name or a training/validation file or training directory."
+        )
     else:
         if args.train_file is not None:
             extension = args.train_file.split(".")[-1]
@@ -471,10 +474,6 @@ def main():
         collate_fn=default_data_collator,
         batch_size=args.per_device_eval_batch_size,
     )
-
-    import pdb
-
-    pdb.set_trace()
 
     # Optimizer
     # Split weights in two groups, one with weight decay and the other not.

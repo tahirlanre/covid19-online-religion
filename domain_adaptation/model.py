@@ -1,5 +1,5 @@
 from transformers import BertPreTrainedModel, BertModel
-from transformers.models.bert.modeling_bert import BertOnlyMLMHead
+from transformers.models.bert.modeling_bert import BertOnlyMLMHead, BertPreTrainingHeads
 
 import torch
 from torch.nn import CrossEntropyLoss, MSELoss
@@ -11,7 +11,7 @@ class DoubleHeadBert(BertPreTrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.bert = BertModel(config)
-        self.cls = BertOnlyMLMHead(config)
+        self.cls = BertPreTrainingHeads(config)
         classifier_dropout = (
             config.classifier_dropout
             if config.classifier_dropout is not None

@@ -13,9 +13,10 @@ import re
 import string
 from nltk.tokenize import TweetTokenizer, word_tokenize
 import emoji
+from transformers import BertTokenizer
 
 from utils.utils import init_logger, log_step
-from preprocess.preprocess import preprocess_text
+from preprocess.preprocess import preprocess_text, tokenizer
 
 logger = logging.getLogger(__name__)
 init_logger()
@@ -31,7 +32,8 @@ punct_chars.sort()
 punctuation = "".join(punct_chars)
 replace = re.compile("[%s]" % re.escape(punctuation))
 
-tokenizer = TweetTokenizer().tokenize
+# tokenizer = TweetTokenizer().tokenize
+bert_tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
 
 def get_filepaths(subreddits):
@@ -107,9 +109,7 @@ def _get_tokenizer(tokenizer):
 
 @log_step
 def add_token_len(dataf):
-    token_lengths = dataf.text.apply(
-        lambda x: len(tokenizer(x.replace("[URL]", "URL")))
-    )
+    token_lengths = dataf.text.apply(lambda x: len(x.split()))
     dataf["token_len"] = token_lengths
 
     return dataf
@@ -118,11 +118,7 @@ def add_token_len(dataf):
 @log_step
 def filter_token_len(dataf, min=3, max=30):
     if "token_len" not in dataf:
-        token_lengths = dataf["text"].apply(
-            lambda x: len(tokenizer(x.replace("[URL]", "URL")))
-        )
-        dataf["token_len"] = token_lengths
-
+        dataf = add_token_len(dataf)
     return dataf.loc[lambda d: (d["token_len"] >= min) & (d["token_len"] <= max)]
 
 
