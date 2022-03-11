@@ -455,6 +455,11 @@ def main():
             desc=f"Grouping texts in chunks of {block_size}",
         )
 
+    # Sanity check - make sure to select only text lengths = block_size
+    lm_datasets = lm_datasets.filter(
+        lambda example: len(example["input_ids"]) == block_size
+    )
+
     train_dataset = lm_datasets["train"]
     eval_dataset = lm_datasets["validation"]
 
