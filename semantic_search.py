@@ -1,10 +1,12 @@
 import os
+import pandas as pd
 import logging
-from pathlib import Path
-import json
+import math
+import argparse
 
 from sentence_transformers import SentenceTransformer, util
 import torch
+import numpy as np
 
 from utils.utils import init_logger
 
@@ -17,13 +19,9 @@ init_logger()
 
 
 def read(fpath):
-    texts = []
-    with open(fpath, "r") as f:
-        for line in f:
-            obj = json.loads(line)
-            text = obj["text"]
-            texts.append(text)
-    return texts
+    dataf = pd.read_json(fpath, lines=True)
+    dataf = dataf[["id", "text"]]
+    return dataf
 
 
 def get_cos_scores(query_embedding, corpus_embeddings):
@@ -40,15 +38,9 @@ def get_cos_scores(query_embedding, corpus_embeddings):
     return cos_scores
 
 
-def main():
-    label = "yoga"
-    input_path = f"./data/reddit/processed/{label}.json"
-    query_path = f"./data/reddit/interim/queries_{label}.txt"
-
-    output_path = f"./data/reddit/interim/cos_scores_{label}.txt"
-
-    logger.info(f" Reading query sentences from {query_path}")
-    with open(query_path, "r") as f:
+def main(args):
+    logger.info(f" Reading query sentences from {args.query_path}")
+    with open(args.query_path, "r") as f:
         queries = f.read().splitlines()
     query_embedding = model.encode(queries, convert_to_tensor=True)
     logger.info(f" Size of query sentences: {len(queries)}")
@@ -56,35 +48,41 @@ def main():
     # get average embedding for all queries
     query_embedding = torch.mean(query_embedding, dim=0)
 
-    logger.info(f" Reading corpus from {input_path}")
-    corpus = read(input_path)
+    logger.info(f" Reading corpus from {args.input_path}")
+    dataf = read(args.input_path)
 
-    if len(corpus) > MAX_CORPUS_SIZE:
+    if len(dataf) > MAX_CORPUS_SIZE:
         logger.info(
-            f" Size of corpus ({len(corpus)}) above limit ({MAX_CORPUS_SIZE}), splitting corpus into chunks of {MAX_CORPUS_SIZE}"
+            f" Size of corpus ({len(dataf)}) above limit ({MAX_CORPUS_SIZE}), splitting corpus into chunks of {MAX_CORPUS_SIZE}"
         )
-        chunks = [
-            corpus[i : i + MAX_CORPUS_SIZE]
-            for i in range(0, len(corpus), MAX_CORPUS_SIZE)
-        ]
+        split_size = math.ceil(len(dataf) / MAX_CORPUS_SIZE)
+        chunks = np.array_split(dataf, split_size)
 
-        cos_scores = []
+        output = []
         for idx, chunk in enumerate(chunks):
             logger.info(f"chunk {idx + 1}")
-            corpus_embeddings = model.encode(chunk, convert_to_tensor=True)
+            corpus_embeddings = model.encode(chunk["text"], convert_to_tensor=True)
 
-            _cos_scores = get_cos_scores(query_embedding, corpus_embeddings)
-            cos_scores.extend(_cos_scores)
+            cos_scores = get_cos_scores(query_embedding, corpus_embeddings)
+
+            output.extend(list(zip(chunk["id"], cos_scores)))
     else:
-        corpus_embeddings = model.encode(corpus, convert_to_tensor=True)
-        logger.info(f" Size of corpus: {len(corpus)}")
+        corpus_embeddings = model.encode(dataf["text"], convert_to_tensor=True)
+        logger.info(f" Size of corpus: {len(dataf)}")
         cos_scores = get_cos_scores(query_embedding, corpus_embeddings)
+        output = list(zip(dataf["id"], cos_scores))
 
-    logger.info(f" Writing cosine similarity scores to {output_path}")
-    with open(output_path, "w") as f_w:
-        for idx, score in enumerate(cos_scores):
-            f_w.write(f"{idx},{score.item():.4f}" + "\n")
+    logger.info(f" Writing cosine similarity scores to {args.output_path}")
+    with open(args.output_path, "w") as f_w:
+        for _id, cos in output:
+            f_w.write(f"{_id},{cos.item():.4f}" + "\n")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_path", type=str)
+    parser.add_argument("--query_path", type=str)
+    parser.add_argument("--output_path", type=str)
+    args = parser.parse_args()
+
+    main(args)
