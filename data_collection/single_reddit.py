@@ -14,7 +14,7 @@ url = "https://api.pushshift.io/reddit/{}/search?limit=1000&sort=desc&{}&before=
 
 def downloadFromUrl(subreddit, object_type, start_time=None):
     filter_string = f"subreddit={subreddit}"
-    output_dir = f"../data/reddit/{subreddit}/"
+    output_dir = f"data/reddit/{subreddit}/"
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     fname = f"{'post' if object_type == 'submission' else object_type}.json"

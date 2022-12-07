@@ -12,16 +12,16 @@ from utils.utils import init_logger
 
 model = SentenceTransformer("all-mpnet-base-v2")
 
-MAX_CORPUS_SIZE = 1000000
+MAX_CORPUS_SIZE = 100000
 
 logger = logging.getLogger(__name__)
 init_logger()
 
 
 def read(fpath):
-    dataf = pd.read_json(fpath, lines=True)
+    dataf = pd.read_json(fpath, lines=True, dtype={"id": str})
     dataf = dataf[["id", "text"]]
-    return dataf
+    return dataf.sample(10000, random_state=42)
 
 
 def get_cos_scores(query_embedding, corpus_embeddings):
@@ -61,13 +61,15 @@ def main(args):
         output = []
         for idx, chunk in enumerate(chunks):
             logger.info(f"chunk {idx + 1}")
-            corpus_embeddings = model.encode(chunk["text"], convert_to_tensor=True)
+            corpus_embeddings = model.encode(
+                chunk["text"].tolist(), convert_to_tensor=True
+            )
 
             cos_scores = get_cos_scores(query_embedding, corpus_embeddings)
 
             output.extend(list(zip(chunk["id"], cos_scores)))
     else:
-        corpus_embeddings = model.encode(dataf["text"], convert_to_tensor=True)
+        corpus_embeddings = model.encode(dataf["text"].tolist(), convert_to_tensor=True)
         logger.info(f" Size of corpus: {len(dataf)}")
         cos_scores = get_cos_scores(query_embedding, corpus_embeddings)
         output = list(zip(dataf["id"], cos_scores))
@@ -75,7 +77,7 @@ def main(args):
     logger.info(f" Writing cosine similarity scores to {args.output_path}")
     with open(args.output_path, "w") as f_w:
         for _id, cos in output:
-            f_w.write(f"{_id},{cos.item():.4f}" + "\n")
+            f_w.write(f"{str(_id)},{cos.item():.4f}" + "\n")
 
 
 if __name__ == "__main__":

@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 def main():
     dts_file = None
-    subreddit = "PrayerRequests"
-    object_type = "submission"
+    subreddit = "Abrahamic"
+    object_type = "comment"
     start_date = None
     end_date = "2020-12-31"
 

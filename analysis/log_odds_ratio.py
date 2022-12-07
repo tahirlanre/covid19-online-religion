@@ -1,3 +1,5 @@
+# code adapted from https://github.com/google-research/google-research/blob/master/goemotions/extract_words.py
+
 import argparse
 import glob
 import os

@@ -1,47 +1,51 @@
+import os
 import time
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor
 from itertools import chain
 import logging
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 
-import modin.pandas as pd
-import ray
+import pandas as pd
 
-from preprocess.preprocess import get_all_tweet_texts
+
 from utils.utils import init_logger
+from preprocess.preprocess import get_tweet_data, normalize_tweet_text
 
-ray.init()
-
-init_logger()
 logger = logging.getLogger(__name__)
 
+init_logger()
 
-month = "07"
-year = "2020"
-data1 = Path(
-    f"/home/zqxh49/Development/phd/covid19-online-religion/data/twitter/UK/{year}/{month}/raw/replies/"
-)
-data2 = Path(
-    f"/media/zqxh49/C28AAF378AAF273F/PHD/data/Covid-19/UK/{year}/{month}-{year}/"
-)
-output_dir = Path(
-    f"/home/zqxh49/Development/phd/covid19-online-religion/data/twitter/UK/{year}/{month}/"
-)
 
-filepaths = []
-filepaths.append(data1.glob("*.jsonl"))
-filepaths.append(data2.glob(f"*-{month}-*.jsonl"))
-filepaths = list(chain(*filepaths))
+def clean_texts(dataf):
+    texts = dataf["text"].apply(normalize_tweet_text)
+    df["text"] = texts
+    return dataf.dropna(subset=["text"])
 
-logger.info(f"***** Total no of filepaths: {len(filepaths)} *****")
 
-logger.info("***** Getting all tweet texts *****")
-ts = time.time()
-with ProcessPoolExecutor() as executor:
-    texts = executor.map(get_all_tweet_texts, filepaths)
-logger.info(f"Took {time.time() - ts} seconds")
+for year in ["2020"]:
+    for month in ["07", "08", "09"]:
+        data1 = Path(f"data/twitter/UK/{year}/{month}/raw/")
+        output_dir = Path(f"data/twitter/UK/clean/{year}/{month}")
 
-df = pd.DataFrame(list(chain(*texts)), columns=["text"]).dropna(subset=["text"])
+        filepaths = []
+        filepaths.append(data1.glob("*.jsonl"))
 
-# drop duplicates
-df = df[~df["text"].duplicated(keep="first")].reset_index(drop=True)
+        filepaths = list(chain(*filepaths))
+        logger.info(f"***** Total no of filepaths: {len(filepaths)} *****")
+
+        columns_to_get = ["id", "text", "author_id", "created_at"]
+        fn = partial(get_tweet_data, columns=columns_to_get)
+
+        logger.info(f"***** Processing tweet data from {month}-{year} *****")
+        ts = time.time()
+        with ProcessPoolExecutor() as executor:
+            data = executor.map(fn, filepaths)
+
+        df = pd.DataFrame(list(chain(*data)), columns=columns_to_get)
+
+        clean_df = df.pipe(clean_texts)
+        logger.info(f"Finished processing all tweets. Took {time.time() - ts} s")
+
+        out_file = os.path.join(output_dir, "data.json")
+        clean_df.to_json(out_file, orient="records", lines=True)

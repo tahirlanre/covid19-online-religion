@@ -1,23 +1,18 @@
 import logging
-from pathlib import Path
 from time import time
-from concurrent.futures import ProcessPoolExecutor
-import re
 import json
-from itertools import chain
+import os
 
-import modin.pandas as pd
-import ray
+import pandas as pd
 
 from utils.utils import init_logger
-
-ray.init()
+from preprocess.preprocess import normalize_reddit_text
 
 logger = logging.getLogger(__name__)
 init_logger()
 
 
-def read_json_data(path):
+def process_data(path):
     """Read json data from file"""
     data = []
     with open(path, "r") as f:
@@ -26,51 +21,41 @@ def read_json_data(path):
                 rec = json.loads(line)
                 dt = pd.to_datetime(rec["created_date"])
                 text = rec["text"]
-
                 # select only posts beween 2011 - 2020
                 if dt.year >= 2011 and dt.year < 2021:
-                    #  discard posts that have been removed or deleted
-                    if not (text == "[removed]") or (text == "[deleted]"):
-                        data.append(rec)
+                    rec["text"] = normalize_reddit_text(text)
+                    data.append(rec)
             except json.decoder.JSONDecodeError:
-                logger.error("Error reading file")
+                logger.error("Error reading json line")
+                continue
     return data
 
 
-def normalize_text(text):
-    """Normalize text."""
-    text = text.replace("\n", "")
-    text = re.sub("\s+", " ", text)
-    text = re.sub(
-        r"http\S*|\S*\.com\S*|\S*www\S*", "URL", text
-    )  # replace urls with URL tag
-    # text = re.sub(r"\s@\S+", "USER", text) # user ment
-    return text
+def write_texts(texts, path):
+    with open(path, "w") as f_w:
+        for text in texts:
+            if text.strip():
+                f_w.write(text + "\n")
 
 
 def main():
-    # get list of subreddits
-    subreddits = []
-    with open("data/reddit/subreddit.txt", "r") as f:
-        subreddits = f.read().splitlines()
-
-    #  get file paths to subreddits posts and comments
-    json_files = []
+    data_dir = "data/reddit/subreddit/"
+    subreddits = ["yoga"]
     for subreddit in subreddits:
-        json_files.extend(list(Path(f"data/reddit/{subreddit}/").glob("*.json")))
+        logger.info(f"Processing subreddit: {subreddit}")
+        start_time = time()
+        json_file = os.path.join(data_dir, subreddit, "post.json")
+        processed_data = process_data(json_file)
 
-    # get data from all subreddits
-    logger.info("Reading json data from file .......")
-    start_time = time()
-    with ProcessPoolExecutor() as executor:
-        data = executor.map(read_json_data, json_files)
-    logger.info(f"Took {time() - start_time} seconds")
-    data = list(chain(*data))
+        df = pd.DataFrame(processed_data)
+        df.drop_duplicates(subset=["id"], inplace=True)  # drop duplicate posts
 
-    df = pd.DataFrame(data)
+        output_path = os.path.join(
+            data_dir, subreddit, f"{subreddit.lower()}_texts.txt"
+        )
+        write_texts(df["text"], output_path)
 
-    # drop duplicates posts
-    df = df[df["id"].duplicated(keep="first")].reset_index(drop=True)
+        logger.info(f"Took {time() - start_time} seconds")
 
 
 if __name__ == "__main__":

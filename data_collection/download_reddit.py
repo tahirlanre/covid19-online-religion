@@ -150,7 +150,7 @@ def download_data(directory, subreddit, object_type, dt):
 
 def setup_download_dir(subreddit, object_type):
     download_dir = Path(
-        f"../data/reddit/{subreddit}/{'post' if object_type == 'submission' else object_type}"
+        f"data/reddit/subreddit/{subreddit}/{'post' if object_type == 'submission' else object_type}"
     )
     if not download_dir.exists():
         download_dir.mkdir(parents=True, exist_ok=True)
